@@ -1,12 +1,20 @@
 import { graphql } from "@octokit/graphql";
 import { useEffect, useState } from "react";
 
+const { REACT_APP_GITHUB_AGORA_STATES_TOKEN, NODE_ENV } = process.env;
+
 function App() {
   const [data, setData] = useState();
+  const [viewer, setViewer] = useState({});
   const [isLoading, setIsLoading] = useState(true);
 
   async function repo() {
-    const { repository } = await graphql(
+    let token;
+    if (NODE_ENV === "development" || NODE_ENV === "test") {
+      token = REACT_APP_GITHUB_AGORA_STATES_TOKEN;
+    }
+
+    const { repository, viewer } = await graphql(
       /* 아래는 요청할 쿼리가 들어가는 영역 */
       `
         {
@@ -23,23 +31,31 @@ function App() {
               }
             }
           }
+          viewer {
+            login
+            avatarUrl
+          }
         }
       `,
       {
         headers: {
-          authorization: `token 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`,
+          authorization: `token ${token}`,
         },
       }
     );
-    return repository;
+    return { repository, viewer };
   }
 
   useEffect(() => {
-    repo().then((res) => {
-      console.log(res);
-      setData(res.discussions.edges);
-      setIsLoading(false);
-    });
+    repo()
+      .then((data) => {
+        setData(data.repository);
+        setViewer(data.viewer);
+        setIsLoading(false);
+      })
+      .catch((error) => {
+        console.log(Error, error);
+      });
   }, []);
 
   return (
@@ -53,7 +69,12 @@ function App() {
                 <span>{el.node.author.resourcePath}</span>
               </li>
             );
-          })}
+          })(
+            <div className="avatar--wrapper">
+              <img src={viewer.avatarUrl} alt={`avatar of ${viewer.login}`} />
+              <span>{viewer.login}</span>
+            </div>
+          )}
     </div>
   );
 }
